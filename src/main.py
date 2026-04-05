@@ -34,16 +34,18 @@ class Game:
         self.font_small = pygame.font.Font(None, 32)
 
         # Juice — screen shake + particles
-        self.world_surface  = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
-        self.shake_timer     = 0   # ms timestamp when shake ends
-        self.shake_intensity = 0   # max pixel displacement
-        self.particles       = []  # list of particle dicts
+        self.world_surface       = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        self.shake_timer         = 0   # ms timestamp when shake ends
+        self.shake_intensity     = 0   # max pixel displacement
+        self.particles           = []  # list of particle dicts
+        self.reflect_flash_until = 0   # ms — brief screen flash after a parry
         
     def reset_game(self):
         self.player = Player((100, FLOOR_Y - 80))
         self.enemies.empty()
         self.projectiles.empty()
         self.particles = []
+        self.reflect_flash_until = 0
         self.score = 0
         self.game_over = False
         self.spawn_delay = 3000
@@ -138,10 +140,34 @@ class Game:
                     self.score += 10
                     self.spawn_sparks(enemy.rect.center)   # impact burst
 
+        # --- Parry / projectile reflection ---
+        # Must run BEFORE the take-damage check so a successful parry
+        # consumes the bullet without also hurting the player.
+        if self.player.in_reflect_window:
+            attack_x = self.player.rect.centerx + 50 if self.player.facing_right else self.player.rect.centerx - 90
+            attack_y = self.player.rect.bottom - 50 if self.player.status == 'duck_attack' else self.player.rect.bottom - 98
+            parry_rect = pygame.Rect(attack_x, attack_y, 40, 60)
+            for proj in list(self.projectiles):
+                if not proj.reflected and parry_rect.colliderect(proj.rect):
+                    proj.reflect()
+                    self.spawn_sparks(proj.rect.center, count=7)   # deflection burst
+                    self.reflect_flash_until = pygame.time.get_ticks() + REFLECT_FLASH_MS
+
+        # --- Reflected projectile hits enemies ---
+        for proj in list(self.projectiles):
+            if proj.reflected:
+                for enemy in list(self.enemies):
+                    if not enemy.hit_flash_until and proj.rect.colliderect(enemy.rect):
+                        enemy.register_hit()
+                        self.score += 25                 # skill bonus
+                        self.spawn_sparks(enemy.rect.center, count=14)  # bigger burst
+                        proj.kill()
+                        break
+
         # --- Projectile hits player (duck-aware hitbox) ---
         core_hitbox = self.player.get_hitbox()
         for proj in list(self.projectiles):
-            if proj.rect.colliderect(core_hitbox):
+            if not proj.reflected and proj.rect.colliderect(core_hitbox):
                 proj.kill()   # always consume the bullet
                 result = self.player.take_damage()
                 if result is True:
@@ -216,8 +242,23 @@ class Game:
                 (int(p['pos'][0]), int(p['pos'][1])), radius
             )
 
+        # --- Glow rings around reflected bullets ---
+        for proj in self.projectiles:
+            if proj.reflected:
+                cx, cy = proj.rect.center
+                pygame.draw.circle(self.world_surface, (0, 210, 255), (cx, cy), 16, 2)
+                pygame.draw.circle(self.world_surface, WHITE,          (cx, cy),  9, 1)
+
         # --- Blit world with shake displacement ---
         self.screen.blit(self.world_surface, (ox, oy))
+
+        # --- Parry screen flash (fixed, never shakes, fades quickly) ---
+        if now < self.reflect_flash_until:
+            t = (self.reflect_flash_until - now) / REFLECT_FLASH_MS
+            alpha = int(90 * t)
+            flash_overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            flash_overlay.fill((180, 240, 255, alpha))
+            self.screen.blit(flash_overlay, (0, 0))
 
         # --- HUD drawn directly on screen (never shakes) ---
         self.draw_hud()

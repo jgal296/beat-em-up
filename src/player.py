@@ -378,6 +378,15 @@ class Player(pygame.sprite.Sprite):
             )
         return self.rect.inflate(-40, -40)
 
+    @property
+    def in_reflect_window(self):
+        """True during the precise frames where the blade is mid-swing.
+        Hitting a projectile in this window reflects it back at enemies."""
+        return (
+            self.is_attacking and
+            REFLECT_FRAME_START <= self.frame_index <= REFLECT_FRAME_END
+        )
+
     def apply_gravity(self):
         self.direction.y += self.gravity
         self.rect.y += self.direction.y

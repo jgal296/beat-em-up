@@ -36,3 +36,8 @@ PLAYER_MAX_HP        = 5          # number of hit points
 INVINCIBILITY_MS     = 1200       # ms of i-frames after a hit
 HIT_FLASH_DURATION   = 80         # ms each flash cycle lasts
 ENEMY_HIT_FLASH_MS   = 120        # ms enemy flashes white before dying
+
+# Projectile reflection (parry)
+REFLECT_FRAME_START = 0.4   # attack frame_index when parry window opens
+REFLECT_FRAME_END   = 2.0   # attack frame_index when parry window closes
+REFLECT_FLASH_MS    = 200   # ms the reflected bullet pulses bright + screen flashes
