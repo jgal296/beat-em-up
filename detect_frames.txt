@@ -1,0 +1,23 @@
+Sheet: 1024x1024  h_row=341
+
+[walk] y=0-341
+  Gap bands (2 total): [(0, 15), (1007, 1023)]
+  Frame segments (1): [(16, 1007)]
+  => DETECTED FRAME COUNT: 1
+    frame 0: x=16-1007 (991px)  tight=982x264
+
+[aim] y=341-682
+  Gap bands (7 total): [(0, 16), (54, 56), (292, 295), (308, 311), (489, 542), (748, 789), (994, 1023)]
+  Frame segments (5): [(17, 54), (57, 292), (312, 489), (543, 748), (790, 994)]
+  => DETECTED FRAME COUNT: 5
+    frame 0: x=17-54 (37px)  NO CHAR
+    frame 1: x=57-292 (235px)  tight=160x249
+    frame 2: x=312-489 (177px)  tight=177x250
+    frame 3: x=543-748 (205px)  tight=205x242
+    frame 4: x=790-994 (204px)  tight=204x242
+
+[shoot] y=682-1024
+  Gap bands (2 total): [(0, 9), (1010, 1023)]
+  Frame segments (1): [(10, 1010)]
+  => DETECTED FRAME COUNT: 1
+    frame 0: x=10-1010 (1000px)  tight=1000x251

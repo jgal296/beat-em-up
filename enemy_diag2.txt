@@ -1,0 +1,26 @@
+Sheet: 1024x1024  BG=(2,255,4)
+Row height: 341
+
+[walk] cells=8 cell_w=128 row_h=341 y=0-341
+  [0] local pos=(25,70) size=103x264 cx=76.5 drift=+12.5
+  [1] local pos=(0,78) size=128x256 cx=64.0 drift=+0.0
+  [2] local pos=(0,72) size=128x262 cx=64.0 drift=+0.0
+  [3] local pos=(0,71) size=128x263 cx=64.0 drift=+0.0
+  [4] local pos=(4,70) size=124x264 cx=66.0 drift=+2.0
+  [5] local pos=(0,74) size=128x260 cx=64.0 drift=+0.0
+  [6] local pos=(0,74) size=128x260 cx=64.0 drift=+0.0
+  [7] local pos=(0,70) size=111x264 cx=55.5 drift=-8.5
+
+[aim] cells=4 cell_w=256 row_h=341 y=341-682
+  [0] local pos=(60,92) size=160x249 cx=140.0 drift=+12.0
+  [1] local pos=(56,91) size=177x250 cx=144.5 drift=+16.5
+  [2] local pos=(31,99) size=205x242 cx=133.5 drift=+5.5
+  [3] local pos=(22,99) size=204x242 cx=124.0 drift=-4.0
+
+[shoot] cells=6 cell_w=170 row_h=342 y=682-1024
+  [0] local pos=(10,86) size=160x248 cx=90.0 drift=+5.0
+  [1] local pos=(0,86) size=170x248 cx=85.0 drift=+0.0
+  [2] local pos=(0,86) size=170x248 cx=85.0 drift=+0.0
+  [3] local pos=(0,99) size=169x91 cx=84.5 drift=-0.5
+  [4] local pos=(0,86) size=164x248 cx=82.0 drift=-3.0
+  [5] local pos=(0,83) size=160x251 cx=80.0 drift=-5.0

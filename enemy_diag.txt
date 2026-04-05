@@ -1,0 +1,30 @@
+pygame 2.6.1 (SDL 2.28.4, Python 3.11.9)
+Hello from the pygame community. https://www.pygame.org/contribute.html
+Sheet size: 1024 x 1024
+Detected BG color: (2, 255, 4)
+
+--- Per-frame bounding boxes ---
+
+[walk]  grid cell: 128 x 341  (y 0–341)
+  frame 0: local(25,70) size(103x264) cx=76.5  drift_from_cell_center=+12.5px
+  frame 1: local(0,78) size(128x256) cx=64.0  drift_from_cell_center=+0.0px
+  frame 2: local(0,72) size(128x262) cx=64.0  drift_from_cell_center=+0.0px
+  frame 3: local(0,71) size(128x263) cx=64.0  drift_from_cell_center=+0.0px
+  frame 4: local(4,70) size(124x264) cx=66.0  drift_from_cell_center=+2.0px
+  frame 5: local(0,74) size(128x260) cx=64.0  drift_from_cell_center=+0.0px
+  frame 6: local(0,74) size(128x260) cx=64.0  drift_from_cell_center=+0.0px
+  frame 7: local(0,70) size(111x264) cx=55.5  drift_from_cell_center=-8.5px
+
+[aim]  grid cell: 256 x 341  (y 341–682)
+  frame 0: local(60,92) size(160x249) cx=140.0  drift_from_cell_center=+12.0px
+  frame 1: local(56,91) size(177x250) cx=144.5  drift_from_cell_center=+16.5px
+  frame 2: local(31,99) size(205x242) cx=133.5  drift_from_cell_center=+5.5px
+  frame 3: local(22,99) size(204x242) cx=124.0  drift_from_cell_center=-4.0px
+
+[shoot]  grid cell: 170 x 342  (y 682–1024)
+  frame 0: local(10,86) size(160x248) cx=90.0  drift_from_cell_center=+5.0px
+  frame 1: local(0,86) size(170x248) cx=85.0  drift_from_cell_center=+0.0px
+  frame 2: local(0,86) size(170x248) cx=85.0  drift_from_cell_center=+0.0px
+  frame 3: local(0,99) size(169x91) cx=84.5  drift_from_cell_center=-0.5px
+  frame 4: local(0,86) size(164x248) cx=82.0  drift_from_cell_center=-3.0px
+  frame 5: local(0,83) size(160x251) cx=80.0  drift_from_cell_center=-5.0px

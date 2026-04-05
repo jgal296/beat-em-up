@@ -1,0 +1,26 @@
+Sheet: 1024x1024  h_row=341
+
+[walk] y=0-341  expected=6
+  Split columns: [1, 344, 518, 685, 1012]
+    frame 0: cols 0-1 (1px)  NO CHAR FOUND
+    frame 1: cols 1-344 (343px)  tight=319x264
+    frame 2: cols 344-518 (174px)  tight=168x263
+    frame 3: cols 518-685 (167px)  tight=164x264
+    frame 4: cols 685-1012 (327px)  tight=322x264
+    frame 5: cols 1012-1024 (12px)  NO CHAR FOUND
+
+[aim] y=341-682  expected=4
+  Split columns: [1, 494, 753]
+    frame 0: cols 0-1 (1px)  NO CHAR FOUND
+    frame 1: cols 1-494 (493px)  tight=429x250
+    frame 2: cols 494-753 (259px)  tight=205x242
+    frame 3: cols 753-1024 (271px)  tight=204x242
+
+[shoot] y=682-1024  expected=6
+  Split columns: [1, 210, 577, 847, 1015]
+    frame 0: cols 0-1 (1px)  NO CHAR FOUND
+    frame 1: cols 1-210 (209px)  tight=200x248
+    frame 2: cols 210-577 (367px)  tight=367x248
+    frame 3: cols 577-847 (270px)  tight=174x248
+    frame 4: cols 847-1015 (168px)  tight=162x251
+    frame 5: cols 1015-1024 (9px)  NO CHAR FOUND

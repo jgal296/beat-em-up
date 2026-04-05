@@ -1,0 +1,11 @@
+
+[walk] detected=1 expected=8
+  frame 0: span_x=16-1007 (991px) => tight size=982x264
+
+[aim] detected=3 expected=4
+  frame 0: span_x=17-489 (472px) => tight size=429x250
+  frame 1: span_x=543-748 (205px) => tight size=205x242
+  frame 2: span_x=790-994 (204px) => tight size=204x242
+
+[shoot] detected=1 expected=6
+  frame 0: span_x=10-1010 (1000px) => tight size=1000x251
