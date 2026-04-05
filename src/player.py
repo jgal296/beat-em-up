@@ -352,14 +352,31 @@ class Player(pygame.sprite.Sprite):
             self.frame_index = 0
 
     def take_damage(self):
-        """Called by main when a projectile hits.  Returns True if the player died."""
+        """Called by main when a projectile hits.
+        Returns  True  if the player just died,
+                 False if hit + survived,
+                 None  if blocked by invincibility frames."""
         now = pygame.time.get_ticks()
         if now < self.invincible_until:
-            return False          # still in i-frames, ignore hit
+            return None           # i-frames active — bullet consumed but no effect
         self.hp -= 1
         self.hit_time = now
         self.invincible_until = now + INVINCIBILITY_MS
         return self.hp <= 0
+
+    def get_hitbox(self):
+        """Return the current collision rect, duck-aware.
+        Crouching covers only the bottom 45 % of the sprite so ground-level
+        projectiles (aimed at the enemy's chest/gun) pass over the player."""
+        if self.is_ducking:
+            duck_h = int(self.rect.height * 0.45)
+            return pygame.Rect(
+                self.rect.x + 20,
+                self.rect.bottom - duck_h,
+                self.rect.width - 40,
+                duck_h - 5,
+            )
+        return self.rect.inflate(-40, -40)
 
     def apply_gravity(self):
         self.direction.y += self.gravity

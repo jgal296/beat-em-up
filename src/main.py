@@ -1,6 +1,8 @@
 import pygame
 import sys
 import os
+import random
+import math
 from settings import *
 from level import Level
 from player import Player
@@ -30,11 +32,18 @@ class Game:
         self.font_big   = pygame.font.Font(None, 74)
         self.font_med   = pygame.font.Font(None, 42)
         self.font_small = pygame.font.Font(None, 32)
+
+        # Juice — screen shake + particles
+        self.world_surface  = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        self.shake_timer     = 0   # ms timestamp when shake ends
+        self.shake_intensity = 0   # max pixel displacement
+        self.particles       = []  # list of particle dicts
         
     def reset_game(self):
         self.player = Player((100, FLOOR_Y - 80))
         self.enemies.empty()
         self.projectiles.empty()
+        self.particles = []
         self.score = 0
         self.game_over = False
         self.spawn_delay = 3000
@@ -51,31 +60,73 @@ class Game:
             else:
                 self.player.handle_event(event)
                 
+    # ------------------------------------------------------------------
+    # Juice helpers
+    # ------------------------------------------------------------------
+    def trigger_shake(self, intensity=8, duration=220):
+        """Start or refresh a camera shake."""
+        self.shake_intensity = intensity
+        self.shake_timer = pygame.time.get_ticks() + duration
+
+    def spawn_sparks(self, pos, count=10):
+        """Burst of coloured particles at world-space *pos*."""
+        colors = [(255, 220, 50), (255, 160, 30), (255, 255, 180), (255, 80, 0)]
+        for _ in range(count):
+            angle = random.uniform(0, 2 * math.pi)
+            speed = random.uniform(2.5, 7.0)
+            lifetime = random.randint(18, 36)   # frames
+            self.particles.append({
+                'pos':          [float(pos[0]), float(pos[1])],
+                'vel':          [math.cos(angle) * speed, math.sin(angle) * speed - 2.5],
+                'color':        random.choice(colors),
+                'lifetime':     lifetime,
+                'max_lifetime': lifetime,
+                'radius':       random.uniform(3.0, 6.5),
+            })
+
+    # ------------------------------------------------------------------
+    # Update
+    # ------------------------------------------------------------------
     def update(self):
         if self.game_over:
             return
-            
+
         self.player.update()
         self.level.scroll_x(self.player.rect, self.player.direction.x)
         self.level.update()
-        
+
         for e in self.enemies:
             e.rect.x += self.level.world_shift
         for p in self.projectiles:
             p.rect.x += self.level.world_shift
-            
+
+        # Particles follow camera
+        for p in self.particles:
+            p['pos'][0] += self.level.world_shift
+
         current_time = pygame.time.get_ticks()
         if current_time - self.last_spawn_time > self.spawn_delay:
-            import random
             spawn_x = -100 if random.choice([True, False]) else SCREEN_WIDTH + 100
             self.enemies.add(Enemy((spawn_x, FLOOR_Y), self.player, self.projectiles))
             self.last_spawn_time = current_time
             self.spawn_delay = max(1000, self.spawn_delay - 100)
-            
+
         self.enemies.update()
         self.projectiles.update()
-        
-        # Player kills enemies — use register_hit() so the flash plays first
+
+        # --- Tick particles ---
+        alive = []
+        for p in self.particles:
+            p['lifetime'] -= 1
+            if p['lifetime'] > 0:
+                p['pos'][0] += p['vel'][0]
+                p['pos'][1] += p['vel'][1]
+                p['vel'][1] += 0.28   # gravity drag
+                p['vel'][0] *= 0.93   # air friction
+                alive.append(p)
+        self.particles = alive
+
+        # --- Player kills enemies ---
         if self.player.is_attacking:
             attack_x = self.player.rect.centerx + 50 if self.player.facing_right else self.player.rect.centerx - 90
             attack_y = self.player.rect.bottom - 50 if self.player.status == 'duck_attack' else self.player.rect.bottom - 98
@@ -85,14 +136,19 @@ class Game:
                 if not enemy.hit_flash_until and attack_rect.colliderect(enemy.rect):
                     enemy.register_hit()
                     self.score += 10
+                    self.spawn_sparks(enemy.rect.center)   # impact burst
 
-        # Projectile hits player — respects invincibility frames
-        core_hitbox = self.player.rect.inflate(-40, -40)
+        # --- Projectile hits player (duck-aware hitbox) ---
+        core_hitbox = self.player.get_hitbox()
         for proj in list(self.projectiles):
             if proj.rect.colliderect(core_hitbox):
                 proj.kill()   # always consume the bullet
-                if self.player.take_damage():
+                result = self.player.take_damage()
+                if result is True:
+                    self.trigger_shake(12, 400)
                     self.game_over = True
+                elif result is False:
+                    self.trigger_shake(6, 200)   # hit — survived
         
     # ------------------------------------------------------------------
     # HUD
@@ -130,18 +186,43 @@ class Game:
         self.screen.blit(shadow, score_rect.move(2, 2))
         self.screen.blit(score_surf, score_rect)
 
+    # ------------------------------------------------------------------
+    # Draw
+    # ------------------------------------------------------------------
     def draw(self):
-        self.level.draw()
+        # --- Compute shake offset ---
+        now = pygame.time.get_ticks()
+        if now < self.shake_timer:
+            ox = random.randint(-self.shake_intensity, self.shake_intensity)
+            oy = random.randint(-self.shake_intensity, self.shake_intensity)
+        else:
+            ox, oy = 0, 0
 
-        # Ensure enemies draw correctly
+        # --- Render world to off-screen surface ---
+        self.level.draw(self.world_surface)
+
         for enemy in self.enemies:
-            enemy.draw(self.screen)
+            enemy.draw(self.world_surface)
 
-        self.projectiles.draw(self.screen)
-        self.player.draw(self.screen)
+        self.projectiles.draw(self.world_surface)
+        self.player.draw(self.world_surface)
 
+        # --- Particles (drawn into world so they shake with it) ---
+        for p in self.particles:
+            t = max(0.0, p['lifetime'] / p['max_lifetime'])
+            radius = max(1, int(p['radius'] * (0.3 + 0.7 * t)))
+            pygame.draw.circle(
+                self.world_surface, p['color'],
+                (int(p['pos'][0]), int(p['pos'][1])), radius
+            )
+
+        # --- Blit world with shake displacement ---
+        self.screen.blit(self.world_surface, (ox, oy))
+
+        # --- HUD drawn directly on screen (never shakes) ---
         self.draw_hud()
 
+        # --- Game-over overlay (fixed to screen) ---
         if self.game_over:
             overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 180))
@@ -160,14 +241,14 @@ class Game:
             self.screen.blit(sub, sub_rect)
 
         pygame.display.flip()
-        
+
     def run(self):
         while self.running:
             self.events()
             self.update()
             self.draw()
             self.clock.tick(FPS)
-            
+
         pygame.quit()
         sys.exit()
 

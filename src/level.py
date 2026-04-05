@@ -35,20 +35,21 @@ class Level:
     def update(self):
         self.bg_scroll += self.world_shift * 0.5  # parallax effect (moves slower than world)
 
-    def draw(self):
+    def draw(self, surface=None):
+        target = surface if surface is not None else self.display_surface
         if self.background:
             bg_width = self.background.get_width()
             # Calculate scroll relative to image width
             rel_x = self.bg_scroll % bg_width
-            
+
             # Calculate how many tiles we need to cover the screen width
             num_tiles = (SCREEN_WIDTH // bg_width) + 2
-            
+
             # Draw primary background and tile it horizontally
             for i in range(-1, num_tiles):
-                self.display_surface.blit(self.background, (rel_x + i * bg_width, 0))
+                target.blit(self.background, (rel_x + i * bg_width, 0))
         else:
-            self.display_surface.fill(BG_COLOR)
-            
+            target.fill(BG_COLOR)
+
         # Draw floor line for reference
-        pygame.draw.line(self.display_surface, WHITE, (0, FLOOR_Y), (SCREEN_WIDTH, FLOOR_Y), 2)
+        pygame.draw.line(target, WHITE, (0, FLOOR_Y), (SCREEN_WIDTH, FLOOR_Y), 2)
