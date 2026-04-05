@@ -11,11 +11,25 @@ WHITE = (255, 255, 255)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 LASER_BLUE = (0, 200, 255)
-HUD_RED    = (220,  50,  50)   # HP bar filled
-HUD_BG     = ( 50,  20,  20)   # HP bar background
-HUD_BORDER = (200, 200, 200)   # HP bar outline
-HUD_GOLD   = (255, 210,  50)   # Score text
-HIT_FLASH_ENEMY = (255, 255, 255)  # white flash on enemy hit
+HUD_RED    = (220,  50,  50)
+HUD_BG     = ( 50,  20,  20)
+HUD_BORDER = (200, 200, 200)
+HUD_GOLD   = (255, 210,  50)
+HIT_FLASH_ENEMY = (255, 255, 255)
+
+# Platforms
+PLATFORM_H          = 16
+PLATFORM_COLOR_TOP  = (  0, 210, 255)   # cyan top-glow edge
+PLATFORM_COLOR_BODY = ( 22,  22,  55)   # dark body
+PLATFORM_COLOR_GLOW = (  0, 120, 200)   # border glow
+
+# Enemy tints (RGBA multiplied onto copies of base frames)
+HEAVY_ENEMY_TINT  = (130,  60, 255, 255)   # deep purple
+
+# Spawn weights (must sum to 1.0)
+SPAWN_W_SHOOTER = 0.55
+SPAWN_W_MELEE   = 0.30
+SPAWN_W_HEAVY   = 0.15
 
 # Paths
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

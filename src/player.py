@@ -387,11 +387,11 @@ class Player(pygame.sprite.Sprite):
             REFLECT_FRAME_START <= self.frame_index <= REFLECT_FRAME_END
         )
 
-    def apply_gravity(self):
+    def apply_gravity(self, platforms=()):
         self.direction.y += self.gravity
         self.rect.y += self.direction.y
-        
-        # Simple Floor collision
+
+        # Floor collision
         if self.rect.bottom >= FLOOR_Y:
             self.rect.bottom = FLOOR_Y
             self.direction.y = 0
@@ -399,19 +399,36 @@ class Player(pygame.sprite.Sprite):
             self.can_double_jump = False
             self.is_double_jumping = False
         else:
-            self.on_ground = False
+            # Platform collision (only when falling)
+            landed = False
+            if self.direction.y >= 0:
+                for plat in platforms:
+                    pr = plat['rect']
+                    if (self.rect.bottom - self.direction.y <= pr.top + 14
+                            and self.rect.bottom >= pr.top
+                            and self.rect.right > pr.left + 8
+                            and self.rect.left  < pr.right - 8):
+                        self.rect.bottom = pr.top
+                        self.direction.y  = 0
+                        self.on_ground    = True
+                        self.can_double_jump  = False
+                        self.is_double_jumping = False
+                        landed = True
+                        break
+            if not landed:
+                self.on_ground = False
 
-    def update(self):
+    def update(self, platforms=()):
         self.get_input()
         self.get_status()
         self.animate()
-        
+
         # Horizontal movement
         self.rect.x += self.direction.x * self.speed
-        
-        # Apply vertical physics
-        self.apply_gravity()
-        
+
+        # Apply vertical physics (platform-aware)
+        self.apply_gravity(platforms)
+
         # Flip image if moving left
         if not self.facing_right:
             self.display_image = pygame.transform.flip(self.image, True, False)
