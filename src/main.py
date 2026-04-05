@@ -106,6 +106,15 @@ class SpawnPortal:
 class Game:
     def __init__(self):
         pygame.init()
+        pygame.joystick.init()
+        # Init any joysticks already connected at startup
+        for i in range(pygame.joystick.get_count()):
+            pygame.joystick.Joystick(i).init()
+        # Block high-frequency axis events — they fire continuously from
+        # analog noise and flood the event queue.  We poll axes directly
+        # in get_input() so we don't need the events at all.
+        pygame.event.set_blocked(pygame.JOYAXISMOTION)
+        pygame.event.set_blocked(pygame.JOYBALLMOTION)
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption("Super Space Brawler")
         self.clock = pygame.clock.Clock() if hasattr(pygame, "clock") else pygame.time.Clock()
@@ -129,11 +138,15 @@ class Game:
         self.font_small = pygame.font.Font(None, 32)
 
         # Juice
-        self.world_surface       = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        self.world_surface       = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT)).convert()
         self.shake_timer         = 0
         self.shake_intensity     = 0
         self.particles           = []
         self.reflect_flash_until = 0
+
+        # Pre-created overlays (avoids per-frame Surface allocation)
+        self._game_over_overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        self._game_over_overlay.fill((0, 0, 0, 180))
 
     # ── Reset ─────────────────────────────────────────────────────────────
 
@@ -155,6 +168,9 @@ class Game:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
+            # Hot-plug: initialise joystick when connected
+            if event.type == pygame.JOYDEVICEADDED:
+                pygame.joystick.Joystick(event.device_index).init()
             if self.game_over:
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
                     self.reset_game()
@@ -399,9 +415,7 @@ class Game:
         self.draw_hud()
 
         if self.game_over:
-            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-            overlay.fill((0, 0, 0, 180))
-            self.screen.blit(overlay, (0, 0))
+            self.screen.blit(self._game_over_overlay, (0, 0))
             text = self.font_big.render("GAME OVER", True, RED)
             self.screen.blit(text, text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 - 60)))
             fs = self.font_med.render(f"Score: {self.score:06d}", True, HUD_GOLD)

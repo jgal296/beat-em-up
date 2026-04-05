@@ -249,20 +249,47 @@ class Player(pygame.sprite.Sprite):
             
     def get_input(self):
         keys = pygame.key.get_pressed()
-        
-        # State locks
+
+        # ── Joystick polling (hat switch + axis fallback) ─────────────────
+        joy_left = joy_right = joy_up = joy_down = False
+        if pygame.joystick.get_count() > 0:
+            # Cache the Joystick object — avoid Joystick(0) lookup at 60 fps
+            if not hasattr(self, '_joystick') or self._joystick is None:
+                self._joystick = pygame.joystick.Joystick(0)
+            joy = self._joystick
+            # Hat / D-pad
+            if joy.get_numhats() > 0:
+                hx, hy = joy.get_hat(0)
+                joy_left  = hx == -1
+                joy_right = hx ==  1
+                joy_up    = hy ==  1
+                joy_down  = hy == -1
+            # Analog axis fallback
+            DEADZONE = 0.5
+            if joy.get_numaxes() > 0:
+                ax = joy.get_axis(0)
+                if ax < -DEADZONE: joy_left  = True
+                if ax >  DEADZONE: joy_right = True
+            if joy.get_numaxes() > 1:
+                ay = joy.get_axis(1)
+                if ay < -DEADZONE: joy_up   = True
+                if ay >  DEADZONE: joy_down = True
+        else:
+            self._joystick = None   # reset on disconnect
+
+        # ── State locks (duck) ────────────────────────────────────────────
         if not self.is_attacking:
             self.is_ducking = False
             if self.on_ground:
-                if keys[pygame.K_s] or keys[pygame.K_DOWN]:
+                if keys[pygame.K_s] or keys[pygame.K_DOWN] or joy_down:
                     self.is_ducking = True
-        
-        # Horizontal movement is disabled while ducking
+
+        # ── Horizontal movement ───────────────────────────────────────────
         if not self.is_ducking:
-            if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+            if keys[pygame.K_RIGHT] or keys[pygame.K_d] or joy_right:
                 self.direction.x = 1
                 self.facing_right = True
-            elif keys[pygame.K_LEFT] or keys[pygame.K_a]:
+            elif keys[pygame.K_LEFT] or keys[pygame.K_a] or joy_left:
                 self.direction.x = -1
                 self.facing_right = False
             else:
@@ -271,17 +298,39 @@ class Player(pygame.sprite.Sprite):
             self.direction.x = 0
                 
     def handle_event(self, event):
+        # ── Keyboard ──────────────────────────────────────────────────────
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_SPACE or event.key == pygame.K_w:
+            if event.key == pygame.K_SPACE or event.key == pygame.K_w or event.key == pygame.K_UP:
                 if self.on_ground:
                     self.jump()
                 elif self.can_double_jump:
                     self.double_jump()
-            elif event.key == pygame.K_z or event.key == pygame.K_j: # Attack key
+            elif event.key == pygame.K_z or event.key == pygame.K_j:
                 self.attack()
         elif event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 1: # Left click
+            if event.button == 1:
                 self.attack()
+
+        # ── Joystick hat (fires once per direction change) ────────────────
+        elif event.type == pygame.JOYHATMOTION:
+            hx, hy = event.value
+            if hy == 1:          # hat UP → jump
+                if self.on_ground:
+                    self.jump()
+                elif self.can_double_jump:
+                    self.double_jump()
+
+        # ── Joystick buttons ──────────────────────────────────────────────
+        elif event.type == pygame.JOYBUTTONDOWN:
+            # Button 0 / 2 → attack  (A/X on most USB sticks)
+            if event.button in (0, 2):
+                self.attack()
+            # Button 1 / 3 → jump    (B/Y on most USB sticks)
+            elif event.button in (1, 3):
+                if self.on_ground:
+                    self.jump()
+                elif self.can_double_jump:
+                    self.double_jump()
 
     def get_status(self):
         if self.is_attacking:
