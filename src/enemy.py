@@ -330,9 +330,9 @@ class MeleeEnemy(Enemy):
             return
         try:
             row_defs = [
-                ('walk',   6, 0,     1/3),
-                ('charge', 6, 1/3,   2/3),
-                ('punch',  6, 2/3,   1.0),
+                ('walk',   6, 0,     0.25),
+                ('charge', 6, 0.25,   0.5),
+                ('punch',  6, 0.5,   0.75)
             ]
             self.animations = _parse_spritesheet(path, row_defs)
             for st in ('charge', 'punch'):
