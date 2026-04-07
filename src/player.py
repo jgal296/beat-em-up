@@ -173,7 +173,7 @@ class Player(pygame.sprite.Sprite):
             else:
                 max_w_scaled, max_h_scaled = 128, 128
                 
-            SURF_W = max(128, max_w_scaled + 20)
+            SURF_W = 110
             SURF_H = max(128, max_h_scaled + 20)
             if SURF_W % 2 != 0: SURF_W += 1
             if SURF_H % 2 != 0: SURF_H += 1
@@ -517,4 +517,4 @@ class Player(pygame.sprite.Sprite):
                 attack_y = self.rect.bottom - 98
 
             attack_rect = pygame.Rect(attack_x, attack_y, 40, 60)
-            pygame.draw.rect(surface, LASER_BLUE, attack_rect, 2)
+            # pygame.draw.rect(surface, LASER_BLUE, attack_rect, 2)

@@ -10,7 +10,7 @@ from projectile import Projectile
 # Shared sprite-sheet parser (used by both Enemy subtypes)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _parse_spritesheet(path, row_defs, target_h=110):
+def _parse_spritesheet(path, row_defs, surf_w, target_h=110, slice_w=None):
     """Load *path*, chroma-key it, and slice it into animation frames.
 
     row_defs: list of (state_name, frame_count, y_start_frac, y_end_frac)
@@ -44,11 +44,12 @@ def _parse_spritesheet(path, row_defs, target_h=110):
         y_start = int(h * y0f)
         y_end   = int(h * y1f)
         row_h   = y_end - y_start
-        cell_w  = w // n_frames
+        current_cell_w = slice_w if slice_w else w // n_frames
         frames  = []
         for i in range(n_frames):
-            x0 = i * cell_w
-            x1 = w if i == n_frames - 1 else (i + 1) * cell_w
+            x0 = i * current_cell_w
+            x1 = min(w, x0 + current_cell_w)
+            if x1 <= x0: continue
             cell  = clean.subsurface(pygame.Rect(x0, y_start, x1-x0, row_h))
             mask  = pygame.mask.from_surface(cell)
             bbs   = [b for b in mask.get_bounding_rects() if b.height > 40]
@@ -73,7 +74,7 @@ def _parse_spritesheet(path, row_defs, target_h=110):
     scale      = target_h / base_h
     scaled_bw  = int(base_w * scale)
     all_items  = [it for st in mapping for it in mapping[st]]
-    SURF_W = max(160, max(int(it['rect'].width  * scale) for it in all_items) + 20)
+    SURF_W = surf_w
     SURF_H = max(160, max(int(it['rect'].height * scale) for it in all_items) + 20)
 
     animations = {st: [] for st in mapping}
@@ -165,7 +166,7 @@ class Enemy(pygame.sprite.Sprite):
                 ('aim',   4, 1/3,   2/3),
                 ('shoot', 6, 2/3,   1.0),
             ]
-            self.animations = _parse_spritesheet(path, row_defs)
+            self.animations = _parse_spritesheet(path, row_defs, surf_w=200, slice_w=200)
 
             # Fallbacks for missing states
             for st in ('aim', 'shoot'):
@@ -260,7 +261,7 @@ class Enemy(pygame.sprite.Sprite):
             if not self.has_shot and self.frame_index >= 1.5:
                 self.has_shot = True
                 sx = self.rect.right if self.facing_right else self.rect.left
-                proj = Projectile((sx, self.rect.centery - 15), self.facing_right)
+                proj = Projectile((sx, self.rect.centery + 5), self.facing_right)
                 self.projectile_group.add(proj)
 
         if self.frame_index >= len(anim):
@@ -334,7 +335,7 @@ class MeleeEnemy(Enemy):
                 ('charge', 6, 0.25,   0.5),
                 ('punch',  6, 0.5,   0.75)
             ]
-            self.animations = _parse_spritesheet(path, row_defs)
+            self.animations = _parse_spritesheet(path, row_defs, surf_w=245)
             for st in ('charge', 'punch'):
                 if not self.animations.get(st):
                     self.animations[st] = self.animations.get('walk', [])
