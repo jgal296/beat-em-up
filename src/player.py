@@ -388,6 +388,7 @@ class Player(pygame.sprite.Sprite):
         self.can_double_jump = False
         self.is_double_jumping = True
         self.frame_index = 0
+        self.double_jump_attack_until = pygame.time.get_ticks() + 1000
         
     def attack(self):
         if not self.is_attacking:
@@ -447,6 +448,7 @@ class Player(pygame.sprite.Sprite):
             self.on_ground = True
             self.can_double_jump = False
             self.is_double_jumping = False
+            self.double_jump_attack_until = 0
         else:
             # Platform collision (only when falling)
             landed = False
@@ -462,6 +464,7 @@ class Player(pygame.sprite.Sprite):
                         self.on_ground    = True
                         self.can_double_jump  = False
                         self.is_double_jumping = False
+                        self.double_jump_attack_until = 0
                         landed = True
                         break
             if not landed:
@@ -508,7 +511,7 @@ class Player(pygame.sprite.Sprite):
         # Debug Hitbox for attack
         if self.is_attacking:
             # Use centerx and bottom so hitbox remains aligned with visually anchored character regardless of dynamic surface size
-            attack_x = self.rect.centerx + 50 if self.facing_right else self.rect.centerx - 90
+            attack_x = self.rect.centerx + 30 if self.facing_right else self.rect.centerx - 70
 
             # Lower the attack box sweeping arc if performing a duck attack!
             if self.status == 'duck_attack':

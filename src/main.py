@@ -283,10 +283,20 @@ class Game:
         self.particles = alive
 
         # ── Player melee kills enemies ────────────────────────────────────
+        dj_active = getattr(self.player, 'double_jump_attack_until', 0) > pygame.time.get_ticks()
+        
+        attack_rects = []
         if self.player.is_attacking:
-            ax = self.player.rect.centerx + 50 if self.player.facing_right else self.player.rect.centerx - 90
+            ax = self.player.rect.centerx + 30 if self.player.facing_right else self.player.rect.centerx - 70
             ay = self.player.rect.bottom - 50 if self.player.status == 'duck_attack' else self.player.rect.bottom - 98
-            attack_rect = pygame.Rect(ax, ay, 40, 60)
+            attack_rects.append(pygame.Rect(ax, ay, 40, 60))
+            
+        if dj_active:
+            dj_rect = pygame.Rect(0, 0, 25, 25)
+            dj_rect.center = self.player.rect.center
+            attack_rects.append(dj_rect)
+
+        for attack_rect in attack_rects:
             for enemy in list(self.enemies):
                 if not enemy.hit_flash_until and attack_rect.colliderect(enemy.rect):
                     enemy.register_hit()
@@ -296,7 +306,7 @@ class Game:
 
         # ── Parry window ──────────────────────────────────────────────────
         if self.player.in_reflect_window:
-            ax = self.player.rect.centerx + 50 if self.player.facing_right else self.player.rect.centerx - 90
+            ax = self.player.rect.centerx + 30 if self.player.facing_right else self.player.rect.centerx - 70
             ay = self.player.rect.bottom - 50 if self.player.status == 'duck_attack' else self.player.rect.bottom - 98
             parry_rect = pygame.Rect(ax, ay, 40, 60)
             for proj in list(self.projectiles):

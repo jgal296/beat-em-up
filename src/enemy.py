@@ -138,6 +138,7 @@ class Enemy(pygame.sprite.Sprite):
         self.animation_speed = 0.1
         self.image = self.animations[self._first_state()][0]
         self.rect  = self.image.get_rect(bottomleft=pos)
+        self.rect.inflate_ip(-self.rect.width // 2, 0)
 
         self.direction = pygame.math.Vector2(0, 0)
         self.speed     = self.SPEED
@@ -166,7 +167,7 @@ class Enemy(pygame.sprite.Sprite):
                 ('aim',   4, 1/3,   2/3),
                 ('shoot', 6, 2/3,   1.0),
             ]
-            self.animations = _parse_spritesheet(path, row_defs, surf_w=200, slice_w=200)
+            self.animations = _parse_spritesheet(path, row_defs, surf_w=240, target_h=132, slice_w=200)
 
             # Fallbacks for missing states
             for st in ('aim', 'shoot'):
@@ -261,7 +262,7 @@ class Enemy(pygame.sprite.Sprite):
             if not self.has_shot and self.frame_index >= 1.5:
                 self.has_shot = True
                 sx = self.rect.right if self.facing_right else self.rect.left
-                proj = Projectile((sx, self.rect.centery + 5), self.facing_right)
+                proj = Projectile((sx, self.rect.centery + -10), self.facing_right)
                 self.projectile_group.add(proj)
 
         if self.frame_index >= len(anim):
@@ -307,12 +308,17 @@ class Enemy(pygame.sprite.Sprite):
         self.apply_gravity()
 
     def draw(self, surface):
+        draw_rect = self.image.get_rect(center=self.rect.center)
+        draw_rect.bottom = self.rect.bottom
         if self.hit_flash_until:
             flash = self.image.copy()
             flash.fill((255, 255, 255, 0), special_flags=pygame.BLEND_RGB_ADD)
-            surface.blit(flash, self.rect)
+            surface.blit(flash, draw_rect)
         else:
-            surface.blit(self.image, self.rect)
+            surface.blit(self.image, draw_rect)
+            
+        # Debug Hitbox
+        # pygame.draw.rect(surface, (255, 0, 0), self.rect, 2)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -335,7 +341,7 @@ class MeleeEnemy(Enemy):
                 ('charge', 6, 0.25,   0.5),
                 ('punch',  6, 0.5,   0.75)
             ]
-            self.animations = _parse_spritesheet(path, row_defs, surf_w=245)
+            self.animations = _parse_spritesheet(path, row_defs, surf_w=490, target_h=220)
             for st in ('charge', 'punch'):
                 if not self.animations.get(st):
                     self.animations[st] = self.animations.get('walk', [])
@@ -414,6 +420,11 @@ class MeleeEnemy(Enemy):
         move_speed = 7 if self.state == 'charge' else (0 if self.state == 'punch' else self.speed)
         self.rect.x += self.direction.x * move_speed
         self.apply_gravity()
+
+    def draw(self, surface):
+        super().draw(surface)
+        # if getattr(self, 'is_punching', False):
+        #    pygame.draw.rect(surface, (255, 165, 0), self.get_punch_rect(), 2)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
