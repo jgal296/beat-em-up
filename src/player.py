@@ -3,6 +3,8 @@ import os
 from settings import *
 
 class Player(pygame.sprite.Sprite):
+    SHARED_ANIMATIONS = None
+    
     def __init__(self, pos):
         super().__init__()
         
@@ -47,6 +49,11 @@ class Player(pygame.sprite.Sprite):
         self.ultimate_active_until = 0
 
     def import_sprites(self):
+        cls = type(self)
+        if cls.SHARED_ANIMATIONS is not None:
+             self.animations = cls.SHARED_ANIMATIONS
+             return
+             
         self.animations = {'idle': [], 'run': [], 'jump': [], 'attack': []}
         
         player_image_path = os.path.join(IMAGE_DIR, "player.png")
@@ -252,6 +259,9 @@ class Player(pygame.sprite.Sprite):
             # Assign dash to use the duck animation
             if not self.animations.get('dash') and self.animations.get('duck'):
                 self.animations['dash'] = self.animations['duck'][:]
+                
+            cls.SHARED_ANIMATIONS = self.animations
+
                 
         except Exception as e:
             print("Failed to slice sprite sheet:", e)

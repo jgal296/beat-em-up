@@ -141,6 +141,10 @@ class Game:
         self.running = True
 
         self.level  = Level()
+        
+        # Preload characters before starting
+        self.preload_assets()
+        
         self.player = Player((100, FLOOR_Y - 80))
 
         self.enemies     = pygame.sprite.Group()
@@ -168,6 +172,25 @@ class Game:
         # Pre-created overlays (avoids per-frame Surface allocation)
         self._game_over_overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         self._game_over_overlay.fill((0, 0, 0, 180))
+
+    def draw_loading_screen(self):
+        self.screen.fill((10, 10, 20))
+        font = pygame.font.SysFont(None, 64)
+        text = font.render(f"LOADING ASSETS...", True, (200, 200, 255))
+        rect = text.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2))
+        self.screen.blit(text, rect)
+        pygame.display.flip()
+
+    def preload_assets(self):
+        self.draw_loading_screen()
+        # Initialize a dummy version of every character to cache their sprites
+        dummy_player = Player((-1000, -1000))
+        dummy_grp = pygame.sprite.Group()
+        _ = Enemy((-1000, -1000), dummy_player, dummy_grp, [])
+        _ = MeleeEnemy((-1000, -1000), dummy_player, dummy_grp, [])
+        _ = HeavyEnemy((-1000, -1000), dummy_player, dummy_grp, [])
+        _ = ShieldEnemy((-1000, -1000), dummy_player, dummy_grp, [])
+        _ = FlyingEnemy((-1000, -1000), dummy_player, dummy_grp, [])
 
     # ── Reset ─────────────────────────────────────────────────────────────
 
