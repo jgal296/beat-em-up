@@ -485,11 +485,30 @@ class FlyingEnemy(Enemy):
     SPEED  = 4
 
     def import_sprites(self):
-        # Uses ranged sprites, tinted greenish to distinguish
-        if Enemy.SHARED_ANIMATIONS is None:
-            Enemy.import_sprites(self)
-            Enemy.SHARED_ANIMATIONS = self.animations
-        self.animations = _tint_animations(Enemy.SHARED_ANIMATIONS, (150, 255, 150, 255))
+        path = os.path.join(IMAGE_DIR, "flying_enemy.png")
+        if not os.path.exists(path):
+            self._create_fallback_sprites({'walk', 'aim', 'shoot'})
+            return
+            
+        cls = type(self)
+        if cls.SHARED_ANIMATIONS is not None:
+             self.animations = cls.SHARED_ANIMATIONS
+             return
+             
+        try:
+            row_defs = [
+                ('walk',  4, 0.0,  0.33),
+                ('aim',   4, 0.33, 0.66),
+                ('shoot', 4, 0.66, 1.0)
+            ]
+            self.animations = _parse_spritesheet(path, row_defs, surf_w=200, target_h=130)
+            # Add fallbacks just in case
+            if not self.animations.get('aim'): self.animations['aim'] = self.animations.get('walk', [])
+            if not self.animations.get('shoot'): self.animations['shoot'] = self.animations.get('aim', [])
+            cls.SHARED_ANIMATIONS = self.animations
+        except Exception as e:
+            print("FlyingEnemy sprite parse failed:", e)
+            self._create_fallback_sprites({'walk', 'aim', 'shoot'})
 
     def apply_gravity(self):
         # Overridden to ignore gravity entirely.
