@@ -45,6 +45,13 @@ DOUBLE_JUMP_FORCE = -12
 # Floor height (where characters walk)
 FLOOR_Y = SCREEN_HEIGHT - 100
 
+# Dash / Dodge Roll
+DASH_SPEED = 18
+DASH_DURATION_MS = 250
+DASH_COOLDOWN_MS = 700
+DASH_IFRAME_DURATION_MS = 250
+AFTERIMAGE_INTERVAL_MS = 40
+
 # Combat / Health
 PLAYER_MAX_HP        = 5          # number of hit points
 INVINCIBILITY_MS     = 1200       # ms of i-frames after a hit

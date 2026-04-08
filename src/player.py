@@ -34,6 +34,14 @@ class Player(pygame.sprite.Sprite):
         self.invincible_until = 0   # ms timestamp
         self.hit_time = 0           # ms timestamp of last hit (drives flash)
 
+        # Dash state
+        self.is_dashing = False
+        self.dash_start_time = 0
+        self.last_dash_time = 0
+        self.last_afterimage_time = 0
+        self.dash_direction = 1
+        self.afterimages = []
+
     def import_sprites(self):
         self.animations = {'idle': [], 'run': [], 'jump': [], 'attack': []}
         
@@ -139,7 +147,7 @@ class Player(pygame.sprite.Sprite):
                 valid_rows[1].extend(valid_rows[2])
                 valid_rows.pop(2)
                 
-            state_keys = ['run', 'jump', 'attack', 'double_jump', 'attack_combo', 'duck', 'duck_attack']
+            state_keys = ['run', 'jump', 'attack', 'double_jump', 'attack_combo', 'duck', 'duck_attack', 'dash']
             
             for state in state_keys:
                 if state not in self.animations:
@@ -236,6 +244,10 @@ class Player(pygame.sprite.Sprite):
                     duck_atk_surf = pygame.Surface((w, h), pygame.SRCALPHA)
                     duck_atk_surf.blit(squashed, (0, h - crouch_height))
                     self.animations['duck_attack'].append(duck_atk_surf)
+
+            # Assign dash to use the duck animation
+            if not self.animations.get('dash') and self.animations.get('duck'):
+                self.animations['dash'] = self.animations['duck'][:]
                 
         except Exception as e:
             print("Failed to slice sprite sheet:", e)
@@ -307,9 +319,13 @@ class Player(pygame.sprite.Sprite):
                     self.double_jump()
             elif event.key == pygame.K_z or event.key == pygame.K_j:
                 self.attack()
+            elif event.key == pygame.K_LSHIFT or event.key == pygame.K_RSHIFT:
+                self.dash()
         elif event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:
                 self.attack()
+            elif event.button == 3:
+                self.dash()
 
         # ── Joystick hat (fires once per direction change) ────────────────
         elif event.type == pygame.JOYHATMOTION:
@@ -331,9 +347,14 @@ class Player(pygame.sprite.Sprite):
                     self.jump()
                 elif self.can_double_jump:
                     self.double_jump()
+            # Button 5 → RB → dash
+            elif event.button == 5:
+                self.dash()
 
     def get_status(self):
-        if self.is_attacking:
+        if self.is_dashing:
+            self.status = 'dash' if self.animations.get('dash') else 'duck'
+        elif self.is_attacking:
             if self.is_ducking and self.animations.get('duck_attack'):
                 self.status = 'duck_attack'
             else:
@@ -400,6 +421,22 @@ class Player(pygame.sprite.Sprite):
                 
             self.is_attacking = True
             self.frame_index = 0
+
+    def dash(self):
+        now = pygame.time.get_ticks()
+        if now - self.last_dash_time > DASH_COOLDOWN_MS:
+            # Cancel ongoing attacks
+            self.is_attacking = False
+            self.combo_active = False
+            self.is_dashing = True
+            
+            self.dash_start_time = now
+            self.last_dash_time = now
+            self.dash_direction = 1 if self.facing_right else -1
+            self.invincible_until = max(self.invincible_until, now + DASH_IFRAME_DURATION_MS)
+            
+            self.afterimages = []
+            self.last_afterimage_time = now
 
     def take_damage(self):
         """Called by main when a projectile hits.
@@ -472,6 +509,33 @@ class Player(pygame.sprite.Sprite):
 
     def update(self, platforms=()):
         self.get_input()
+
+        now = pygame.time.get_ticks()
+        
+        if self.is_dashing:
+            if now - self.dash_start_time < DASH_DURATION_MS:
+                self.direction.x = self.dash_direction
+                self.speed = DASH_SPEED
+                
+                # spawn afterimages
+                if now - self.last_afterimage_time > AFTERIMAGE_INTERVAL_MS:
+                    # store image without the hit flash modification yet
+                    self.afterimages.append({
+                        'image': getattr(self, 'display_image', self.image).copy(),
+                        'rect': self.rect.copy(),
+                        'time': now
+                    })
+                    self.last_afterimage_time = now
+            else:
+                self.is_dashing = False
+                self.speed = PLAYER_SPEED
+                self.direction.x = 0
+        else:
+            self.speed = PLAYER_SPEED
+
+        # Clean old afterimages (fade duration ~250ms)
+        self.afterimages = [ai for ai in self.afterimages if now - ai['time'] < 250]
+
         self.get_status()
         self.animate()
 
@@ -489,9 +553,20 @@ class Player(pygame.sprite.Sprite):
 
     def draw(self, surface):
         draw_img = self.display_image if hasattr(self, 'display_image') else self.image
+        now = pygame.time.get_ticks()
+
+        # Draw dash afterimages
+        for ai in self.afterimages:
+            age = now - ai['time']
+            alpha = max(0, 150 - int((age / 250) * 150))
+            if alpha > 0:
+                ghost = ai['image'].copy()
+                ghost.set_alpha(alpha)
+                # Apply a slight cyan/blue tint to afterimages
+                ghost.fill((0, 150, 255, 0), special_flags=pygame.BLEND_RGBA_ADD)
+                surface.blit(ghost, ai['rect'])
 
         # --- Hit flash: rapidly cycle a red-tinted copy while invincible ---
-        now = pygame.time.get_ticks()
         if now < self.invincible_until:
             elapsed = now - self.hit_time
             flash_on = (elapsed // HIT_FLASH_DURATION) % 2 == 0
