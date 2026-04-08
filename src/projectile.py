@@ -70,3 +70,23 @@ class Projectile(pygame.sprite.Sprite):
         # Cull when well off-screen
         if self.rect.right < -1000 or self.rect.left > SCREEN_WIDTH + 1000:
             self.kill()
+
+class Bomb(pygame.sprite.Sprite):
+    def __init__(self, pos):
+        super().__init__()
+        # Bomb visual: larger reddish circle
+        self.image = pygame.Surface((18, 18), pygame.SRCALPHA)
+        pygame.draw.circle(self.image, (255, 50, 50), (9, 9), 9)
+        pygame.draw.circle(self.image, (255, 200, 0), (9, 9), 4)
+        
+        self.rect = self.image.get_rect(center=pos)
+        self.direction_y = 2  # initial fall speed
+        self.gravity = GRAVITY * 0.5  # falls slower than player
+
+    def update(self):
+        self.direction_y += self.gravity
+        self.rect.y += self.direction_y
+        
+        # Kill bomb if it falls out of screen without hitting the floor 
+        if self.rect.top > SCREEN_HEIGHT + 200:
+            self.kill()

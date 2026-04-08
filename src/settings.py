@@ -27,9 +27,19 @@ PLATFORM_COLOR_GLOW = (  0, 120, 200)   # border glow
 HEAVY_ENEMY_TINT  = (130,  60, 255, 255)   # deep purple
 
 # Spawn weights (must sum to 1.0)
-SPAWN_W_SHOOTER = 0.55
-SPAWN_W_MELEE   = 0.30
+SPAWN_W_SHOOTER = 0.30
+SPAWN_W_MELEE   = 0.25
 SPAWN_W_HEAVY   = 0.15
+SPAWN_W_SHIELD  = 0.15
+SPAWN_W_FLYING  = 0.15
+
+# Energy and Ultimate
+PLAYER_MAX_ENERGY    = 100
+ENERGY_PER_HIT       = 10
+ENERGY_PER_DAMAGE_TAKEN = 5
+ULTIMATE_DAMAGE      = 2
+ULTIMATE_IFRAME_MS   = 1500
+HUD_BLUE             = (0, 150, 255)
 
 # Paths
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

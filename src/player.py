@@ -41,6 +41,10 @@ class Player(pygame.sprite.Sprite):
         self.last_afterimage_time = 0
         self.dash_direction = 1
         self.afterimages = []
+        
+        # Ultimate / Energy
+        self.energy = 0
+        self.ultimate_active_until = 0
 
     def import_sprites(self):
         self.animations = {'idle': [], 'run': [], 'jump': [], 'attack': []}
@@ -321,6 +325,8 @@ class Player(pygame.sprite.Sprite):
                 self.attack()
             elif event.key == pygame.K_LSHIFT or event.key == pygame.K_RSHIFT:
                 self.dash()
+            elif event.key == pygame.K_f:
+                self.use_ultimate()
         elif event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:
                 self.attack()
@@ -350,6 +356,9 @@ class Player(pygame.sprite.Sprite):
             # Button 5 → RB → dash
             elif event.button == 5:
                 self.dash()
+            # Button 4 → LB → Ultimate
+            elif event.button == 4:
+                self.use_ultimate()
 
     def get_status(self):
         if self.is_dashing:
@@ -424,6 +433,9 @@ class Player(pygame.sprite.Sprite):
 
     def dash(self):
         now = pygame.time.get_ticks()
+        # Don't allow dash while in ultimate cast invincibility
+        if now < self.ultimate_active_until: return
+        
         if now - self.last_dash_time > DASH_COOLDOWN_MS:
             # Cancel ongoing attacks
             self.is_attacking = False
@@ -444,12 +456,28 @@ class Player(pygame.sprite.Sprite):
                  False if hit + survived,
                  None  if blocked by invincibility frames."""
         now = pygame.time.get_ticks()
-        if now < self.invincible_until:
+        if now < self.invincible_until or now < self.ultimate_active_until:
             return None           # i-frames active — bullet consumed but no effect
+            
         self.hp -= 1
         self.hit_time = now
         self.invincible_until = now + INVINCIBILITY_MS
+        self.gain_energy(ENERGY_PER_DAMAGE_TAKEN)
         return self.hp <= 0
+        
+    def gain_energy(self, amount):
+        now = pygame.time.get_ticks()
+        if now < self.ultimate_active_until:
+            return # Can't gain energy while casting ultimate
+        self.energy = min(PLAYER_MAX_ENERGY, self.energy + amount)
+        
+    def use_ultimate(self):
+        if self.energy >= PLAYER_MAX_ENERGY:
+            self.energy = 0
+            now = pygame.time.get_ticks()
+            self.ultimate_active_until = now + ULTIMATE_IFRAME_MS
+            # Flash full screen will be handled by main checking this property
+            self.trigger_ultimate_flag = True
 
     def get_hitbox(self):
         """Return the current collision rect, duck-aware.
@@ -567,10 +595,17 @@ class Player(pygame.sprite.Sprite):
                 surface.blit(ghost, ai['rect'])
 
         # --- Hit flash: rapidly cycle a red-tinted copy while invincible ---
-        if now < self.invincible_until:
-            elapsed = now - self.hit_time
+        if now < self.invincible_until or now < self.ultimate_active_until:
+            elapsed = now - self.hit_time if now > self.hit_time else 0
             flash_on = (elapsed // HIT_FLASH_DURATION) % 2 == 0
-            if flash_on:
+            
+            # If ultimate is active, flash blue/cyan instead!
+            if now < self.ultimate_active_until:
+                flash_on = True
+                flash_surf = draw_img.copy()
+                flash_surf.fill((0, 200, 255, 160), special_flags=pygame.BLEND_RGBA_MULT)
+                surface.blit(flash_surf, self.rect)
+            elif flash_on:
                 # Build a red overlay the same size as the current frame
                 flash_surf = draw_img.copy()
                 flash_surf.fill((220, 0, 0, 160), special_flags=pygame.BLEND_RGBA_MULT)

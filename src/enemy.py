@@ -3,7 +3,7 @@ import os
 import math
 from collections import Counter
 from settings import *
-from projectile import Projectile
+from projectile import Projectile, Bomb
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -284,13 +284,14 @@ class Enemy(pygame.sprite.Sprite):
 
     # ── Combat ────────────────────────────────────────────────────────────
 
-    def register_hit(self):
+    def register_hit(self, attacker_centerx=None):
         self.hp -= 1
         if self.hp <= 0:
             self.hit_flash_until = pygame.time.get_ticks() + ENEMY_HIT_FLASH_MS
         else:
             # Stagger flash — shorter, doesn't kill
             self.hit_flash_until = pygame.time.get_ticks() + ENEMY_HIT_FLASH_MS // 2
+        return True
 
     # ── Update / Draw ─────────────────────────────────────────────────────
 
@@ -443,3 +444,116 @@ class HeavyEnemy(Enemy):
             Enemy.import_sprites(self)
             Enemy.SHARED_ANIMATIONS = self.animations
         self.animations = _tint_animations(Enemy.SHARED_ANIMATIONS, HEAVY_ENEMY_TINT)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ShieldEnemy (blocks front attacks)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ShieldEnemy(MeleeEnemy):
+    SHARED_ANIMATIONS = None
+    HP_MAX = 4   # High HP
+    SPEED  = 2   # Slow walking
+
+    def import_sprites(self):
+        # Uses melee sprites, but tinted slightly blue/grey to indicate armor
+        if MeleeEnemy.SHARED_ANIMATIONS is None:
+            MeleeEnemy.import_sprites(self)
+            MeleeEnemy.SHARED_ANIMATIONS = self.animations
+        self.animations = _tint_animations(MeleeEnemy.SHARED_ANIMATIONS, (150, 180, 255, 255))
+        
+    def register_hit(self, attacker_centerx=None):
+        if attacker_centerx is not None:
+            # Facing right means shield is on the right
+            hit_from_front = (self.facing_right and attacker_centerx > self.rect.centerx) or \
+                             (not self.facing_right and attacker_centerx < self.rect.centerx)
+            
+            if hit_from_front:
+                # Blocked! Small flash but no damage.
+                self.hit_flash_until = pygame.time.get_ticks() + 80
+                return False
+                
+        # Hit from behind (or unknown), take damage normally
+        return super().register_hit(attacker_centerx)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FlyingEnemy (hovers out of reach, drops bombs)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class FlyingEnemy(Enemy):
+    SHARED_ANIMATIONS = None
+    HP_MAX = 2
+    SPEED  = 4
+
+    def import_sprites(self):
+        # Uses ranged sprites, tinted greenish to distinguish
+        if Enemy.SHARED_ANIMATIONS is None:
+            Enemy.import_sprites(self)
+            Enemy.SHARED_ANIMATIONS = self.animations
+        self.animations = _tint_animations(Enemy.SHARED_ANIMATIONS, (150, 255, 150, 255))
+
+    def apply_gravity(self):
+        # Overridden to ignore gravity entirely.
+        pass
+
+    def ai_logic(self):
+        now = pygame.time.get_ticks()
+        
+        # Lock altitude to hover height
+        hover_y = FLOOR_Y - 240
+        if self.rect.bottom > hover_y:
+            self.rect.bottom -= 2
+        elif self.rect.bottom < hover_y:
+            self.rect.bottom += 2
+            
+        if now < self.cooldown_end_time:
+            self.state = 'walk'
+            self.direction.x = 0
+            return
+            
+        distance = self.player.rect.centerx - self.rect.centerx
+        abs_distance = abs(distance)
+        self.facing_right = distance > 0
+        
+        if self.state == 'walk':
+            if self.on_screen() and abs_distance < 30:
+                # Player is directly below! Drop a bomb.
+                self.state = 'aim'
+                self.frame_index = 0
+                self.direction.x = 0
+            elif self.on_screen() or abs_distance < 800:
+                # Track the player
+                self.direction.x = 1 if distance > 0 else -1
+            else:
+                self.direction.x = 0
+        elif self.state in ('aim', 'shoot'):
+            self.direction.x = 0
+
+    def animate(self):
+        # Subclass animate to drop bombs instead of projectiles
+        anim = self.animations.get(self.state) or self.animations[self._first_state()]
+        self.frame_index += self.animation_speed
+
+        if self.state == 'shoot':
+            self.frame_index += 0.05
+            if not self.has_shot and self.frame_index >= 1.5:
+                self.has_shot = True
+                # Drop a bomb directly down
+                bomb = Bomb((self.rect.centerx, self.rect.bottom))
+                self.projectile_group.add(bomb)
+
+        if self.frame_index >= len(anim):
+            if self.state == 'aim':
+                self.state       = 'shoot'
+                self.frame_index = 0
+                self.has_shot    = False
+                anim = self.animations['shoot']
+            elif self.state == 'shoot':
+                self.state            = 'walk'
+                self.cooldown_end_time = pygame.time.get_ticks() + 2000 # Longer cooldown for bombs
+                self.frame_index      = 0
+                anim = self.animations[self._first_state()]
+            else:
+                self.frame_index = 0
+
+        frame = anim[min(int(self.frame_index), len(anim)-1)]
+        self.image = pygame.transform.flip(frame, True, False) if not self.facing_right else frame

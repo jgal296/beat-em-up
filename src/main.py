@@ -6,9 +6,29 @@ import math
 from settings import *
 from level import Level
 from player import Player
-from enemy import Enemy, MeleeEnemy, HeavyEnemy
-from projectile import Projectile
+from enemy import Enemy, MeleeEnemy, HeavyEnemy, ShieldEnemy, FlyingEnemy
+from projectile import Projectile, Bomb
 
+class SpikeTrap(pygame.sprite.Sprite):
+    def __init__(self, pos):
+        super().__init__()
+        self.image = pygame.Surface((40, 20), pygame.SRCALPHA)
+        # Draw spikes
+        for i in range(4):
+            pygame.draw.polygon(self.image, (180, 180, 180), [(i*10, 20), (i*10+5, 0), (i*10+10, 20)])
+            pygame.draw.polygon(self.image, (100, 100, 100), [(i*10, 20), (i*10+5, 0), (i*10+10, 20)], 1)
+        self.rect = self.image.get_rect(bottomleft=pos)
+        self.is_barrel = False
+
+class ExplosiveBarrel(pygame.sprite.Sprite):
+    def __init__(self, pos):
+        super().__init__()
+        self.image = pygame.Surface((30, 40), pygame.SRCALPHA)
+        pygame.draw.rect(self.image, (150, 50, 0), (0,0, 30, 40))
+        pygame.draw.rect(self.image, (50,50,50), (0, 5, 30, 5))
+        pygame.draw.rect(self.image, (50,50,50), (0, 30, 30, 5))
+        self.rect = self.image.get_rect(bottomleft=pos)
+        self.is_barrel = True
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Spawn Portal
@@ -125,6 +145,7 @@ class Game:
 
         self.enemies     = pygame.sprite.Group()
         self.projectiles = pygame.sprite.Group()
+        self.hazards     = pygame.sprite.Group()
         self.portals     = []
 
         self.score     = 0
@@ -154,6 +175,7 @@ class Game:
         self.player = Player((100, FLOOR_Y - 80))
         self.enemies.empty()
         self.projectiles.empty()
+        self.hazards.empty()
         self.portals  = []
         self.particles = []
         self.reflect_flash_until = 0
@@ -206,7 +228,11 @@ class Game:
             return Enemy
         elif r < SPAWN_W_SHOOTER + SPAWN_W_MELEE:
             return MeleeEnemy
-        return HeavyEnemy
+        elif r < SPAWN_W_SHOOTER + SPAWN_W_MELEE + SPAWN_W_HEAVY:
+            return HeavyEnemy
+        elif r < SPAWN_W_SHOOTER + SPAWN_W_MELEE + SPAWN_W_HEAVY + SPAWN_W_SHIELD:
+            return ShieldEnemy
+        return FlyingEnemy
 
     def _make_spawn(self, pos, enemy_cls, via_portal=False):
         platforms = self.level.platforms
@@ -217,6 +243,12 @@ class Game:
             self.enemies.add(enemy_cls(pos, *ctor_args))
 
     def _do_spawn(self):
+        if random.random() < 0.10:
+            spawn_x = random.randint(100, SCREEN_WIDTH - 100)
+            hazard_cls = random.choice([ExplosiveBarrel, SpikeTrap])
+            self.hazards.add(hazard_cls((spawn_x, FLOOR_Y)))
+            return
+            
         platforms = self.level.platforms
         # 35 % chance: spawn on a visible platform via portal
         if platforms and random.random() < 0.35:
@@ -234,6 +266,36 @@ class Game:
 
     # ── Update ────────────────────────────────────────────────────────────
 
+    def detonate_barrel(self, barrel):
+        self.trigger_shake(15, 300)
+        self.spawn_sparks(barrel.rect.center, count=25)
+        blast_rect = barrel.rect.inflate(220, 220)
+        if blast_rect.colliderect(self.player.get_hitbox()):
+            self.player.take_damage()
+        for enemy in list(self.enemies):
+            if blast_rect.colliderect(enemy.rect):
+                enemy.register_hit(attacker_centerx=barrel.rect.centerx)
+                if enemy.hp <= 0:
+                    self.score += 5
+        if barrel in self.hazards:
+            barrel.kill()
+            
+    def trigger_ultimate(self):
+        self.trigger_shake(20, 800)
+        now = pygame.time.get_ticks()
+        self.ultimate_nova_start = now
+        
+        # Visual flash handled in player and draw
+        self.projectiles.empty()
+        for enemy in list(self.enemies):
+            enemy.hp -= ULTIMATE_DAMAGE
+            if enemy.hp <= 0:
+                self.score += 15
+                self.spawn_sparks(enemy.rect.center, count=15)
+                enemy.kill()
+            else:
+                enemy.hit_flash_until = now + 500
+
     def update(self):
         if self.game_over:
             return
@@ -248,6 +310,8 @@ class Game:
             e.rect.x += self.level.world_shift
         for p in self.projectiles:
             p.rect.x += self.level.world_shift
+        for h in self.hazards:
+            h.rect.x += self.level.world_shift
         for portal in self.portals:
             portal.shift(self.level.world_shift)
         for p in self.particles:
@@ -282,7 +346,12 @@ class Game:
                 alive.append(p)
         self.particles = alive
 
-        # ── Player melee kills enemies ────────────────────────────────────
+        # Ultimate Logic
+        if getattr(self.player, 'trigger_ultimate_flag', False):
+            self.player.trigger_ultimate_flag = False
+            self.trigger_ultimate()
+
+        # ── Player melee hits & Hazard hits ────────────────────────────────
         dj_active = getattr(self.player, 'double_jump_attack_until', 0) > pygame.time.get_ticks()
         
         attack_rects = []
@@ -299,10 +368,18 @@ class Game:
         for attack_rect in attack_rects:
             for enemy in list(self.enemies):
                 if not enemy.hit_flash_until and attack_rect.colliderect(enemy.rect):
-                    enemy.register_hit()
-                    if enemy.hp <= 0:
-                        self.score += 10
-                        self.spawn_sparks(enemy.rect.center)
+                    if enemy.register_hit(attacker_centerx=self.player.rect.centerx):
+                        self.player.gain_energy(ENERGY_PER_HIT)
+                        if enemy.hp <= 0:
+                            self.score += 10
+                            self.spawn_sparks(enemy.rect.center)
+                    else:
+                        # Hit from front on ShieldEnemy -> block spark
+                        self.spawn_sparks(enemy.rect.center, count=3)
+            
+            for hazard in list(self.hazards):
+                if getattr(hazard, 'is_barrel', False) and attack_rect.colliderect(hazard.rect):
+                    self.detonate_barrel(hazard)
 
         # ── Parry window ──────────────────────────────────────────────────
         if self.player.in_reflect_window:
@@ -310,22 +387,34 @@ class Game:
             ay = self.player.rect.bottom - 50 if self.player.status == 'duck_attack' else self.player.rect.bottom - 98
             parry_rect = pygame.Rect(ax, ay, 40, 60)
             for proj in list(self.projectiles):
-                if not proj.reflected and parry_rect.colliderect(proj.rect):
-                    proj.reflect()
-                    self.spawn_sparks(proj.rect.center, count=7)
-                    self.reflect_flash_until = pygame.time.get_ticks() + REFLECT_FLASH_MS
+                if not getattr(proj, 'reflected', False) and parry_rect.colliderect(proj.rect):
+                    if hasattr(proj, 'reflect'):
+                        proj.reflect()
+                        self.spawn_sparks(proj.rect.center, count=7)
+                        self.reflect_flash_until = pygame.time.get_ticks() + REFLECT_FLASH_MS
+                    elif isinstance(proj, Bomb):
+                        # Swatting a bomb detonates it instantly
+                        self.detonate_barrel(proj)
+                        proj.kill()
 
-        # ── Reflected projectile hits enemies ─────────────────────────────
+        # ── Reflected projectile hits enemies / barrels ─────────────────────
         for proj in list(self.projectiles):
-            if proj.reflected:
+            if getattr(proj, 'reflected', False):
                 for enemy in list(self.enemies):
                     if not enemy.hit_flash_until and proj.rect.colliderect(enemy.rect):
-                        enemy.register_hit()
-                        if enemy.hp <= 0:
-                            self.score += 25
-                        self.spawn_sparks(enemy.rect.center, count=14)
+                        if enemy.register_hit(attacker_centerx=proj.rect.centerx):
+                            self.player.gain_energy(ENERGY_PER_HIT)
+                            if enemy.hp <= 0:
+                                self.score += 25
+                            self.spawn_sparks(enemy.rect.center, count=14)
+                        else:
+                            self.spawn_sparks(enemy.rect.center, count=3)
                         proj.kill()
                         break
+                for hazard in list(self.hazards):
+                    if getattr(hazard, 'is_barrel', False) and proj.rect.colliderect(hazard.rect):
+                        self.detonate_barrel(hazard)
+                        proj.kill()
 
         # ── Melee enemy punch hits player ─────────────────────────────────
         for enemy in list(self.enemies):
@@ -340,10 +429,16 @@ class Game:
                         elif result is False:
                             self.trigger_shake(6, 200)
 
-        # ── Projectile hits player (duck-aware, non-reflected only) ───────
+        # ── Projectile & Bomb hits player (duck-aware, non-reflected only) ───────
         core_hitbox = self.player.get_hitbox()
         for proj in list(self.projectiles):
-            if not proj.reflected and proj.rect.colliderect(core_hitbox):
+            if isinstance(proj, Bomb):
+                if proj.rect.bottom >= FLOOR_Y:
+                    self.detonate_barrel(proj) # treat bomb explosion like barrel
+                    proj.kill()
+                    continue
+                    
+            if not getattr(proj, 'reflected', False) and proj.rect.colliderect(core_hitbox):
                 proj.kill()
                 result = self.player.take_damage()
                 if result is True:
@@ -351,6 +446,24 @@ class Game:
                     self.game_over = True
                 elif result is False:
                     self.trigger_shake(6, 200)
+
+        # ── Hazards hits player ────────────────────────────────────────────────
+        for hazard in list(self.hazards):
+            if not getattr(hazard, 'is_barrel', False) and hazard.rect.colliderect(core_hitbox):
+                # Spike trap!
+                result = self.player.take_damage()
+                # bounce player
+                if self.player.rect.centerx < hazard.rect.centerx:
+                    self.player.direction.x = -8
+                else:
+                    self.player.direction.x = 8
+                self.player.direction.y = -5
+                    
+                if result is True:
+                    self.trigger_shake(12, 400)
+                    self.game_over = True
+                elif result is False:
+                    self.trigger_shake(10, 200)
 
     # ── HUD ───────────────────────────────────────────────────────────────
 
@@ -368,6 +481,18 @@ class Game:
             color = HUD_RED if i < self.player.hp else HUD_BG
             pygame.draw.rect(self.screen, color, pip_rect, border_radius=4)
             pygame.draw.rect(self.screen, HUD_BORDER, pip_rect, 2, border_radius=4)
+            
+        # Energy Bar HUD
+        eng_w = total_bar_w
+        eng_h = 8
+        eng_y = bar_y + pip_h + 8
+        pygame.draw.rect(self.screen, HUD_BG, (bar_x, eng_y, eng_w, eng_h))
+        pygame.draw.rect(self.screen, HUD_BLUE, (bar_x, eng_y, int(eng_w * (self.player.energy / PLAYER_MAX_ENERGY)), eng_h))
+        pygame.draw.rect(self.screen, HUD_BORDER, (bar_x, eng_y, eng_w, eng_h), 1)
+        
+        eng_label = self.font_small.render("ULT", True, HUD_BLUE if self.player.energy == PLAYER_MAX_ENERGY else HUD_BORDER)
+        self.screen.blit(eng_label, (bar_x + eng_w + 10, eng_y - 8))
+        
         score_str  = f"SCORE  {self.score:06d}"
         score_surf = self.font_med.render(score_str, True, HUD_GOLD)
         score_rect = score_surf.get_rect(topright=(SCREEN_WIDTH - 20, 16))
@@ -394,8 +519,31 @@ class Game:
         for enemy in self.enemies:
             enemy.draw(self.world_surface)
 
+        self.hazards.draw(self.world_surface)
         self.projectiles.draw(self.world_surface)
         self.player.draw(self.world_surface)
+
+        # Ultimate Nova Expansion
+        if getattr(self, 'ultimate_nova_start', 0) > 0:
+            nova_elapsed = now - self.ultimate_nova_start
+            if nova_elapsed < 800:
+                progress = nova_elapsed / 800.0
+                radius = int((progress ** 0.5) * 1400) # fast start, slowing down
+                
+                cx, cy = self.player.rect.center
+                # 8 giant slashes outwards
+                for i in range(8):
+                    angle = i * (math.pi / 4)
+                    dx = math.cos(angle) * radius
+                    dy = math.sin(angle) * radius
+                    thickness = max(1, int(45 * (1.0 - progress)))
+                    pygame.draw.line(self.world_surface, (0, 200, 255), (cx, cy), (cx + dx, cy + dy), thickness)
+                    pygame.draw.line(self.world_surface, WHITE, (cx, cy), (cx + dx, cy + dy), max(1, thickness//3))
+                    
+                # Expanding hollow ring
+                ring_thickness = max(2, int(90 * (1.0 - progress)))
+                if radius > ring_thickness:
+                    pygame.draw.circle(self.world_surface, (0, 210, 255), (cx, cy), radius, ring_thickness)
 
         # Particles
         for p in self.particles:
@@ -407,7 +555,7 @@ class Game:
 
         # Glow around reflected projectiles
         for proj in self.projectiles:
-            if proj.reflected:
+            if getattr(proj, 'reflected', False):
                 cx, cy = proj.rect.center
                 pygame.draw.circle(self.world_surface, (0, 210, 255), (cx, cy), 16, 2)
                 pygame.draw.circle(self.world_surface, WHITE,          (cx, cy),  9, 1)
