@@ -497,11 +497,11 @@ class FlyingEnemy(Enemy):
              
         try:
             row_defs = [
-                ('walk',  4, 0.0,  0.33),
-                ('aim',   4, 0.33, 0.66),
-                ('shoot', 4, 0.66, 1.0)
+                ('walk',  8, 0.0,  0.2),
+                ('aim',   8, 0.2, 0.4),
+                ('shoot', 8, 0.4, 0.6)
             ]
-            self.animations = _parse_spritesheet(path, row_defs, surf_w=200, target_h=130)
+            self.animations = _parse_spritesheet(path, row_defs, surf_w=200, target_h=130, slice_w=130)
             # Add fallbacks just in case
             if not self.animations.get('aim'): self.animations['aim'] = self.animations.get('walk', [])
             if not self.animations.get('shoot'): self.animations['shoot'] = self.animations.get('aim', [])
