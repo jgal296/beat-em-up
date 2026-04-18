@@ -330,6 +330,7 @@ class MeleeEnemy(Enemy):
     SHARED_ANIMATIONS = None
     HP_MAX = 1
     SPEED  = 5
+    POST_PUNCH_PAUSE_MS = 2000
 
     def import_sprites(self):
         path = os.path.join(IMAGE_DIR, "melee_enemy.png")
@@ -353,6 +354,13 @@ class MeleeEnemy(Enemy):
     # ── AI ────────────────────────────────────────────────────────────────
 
     def ai_logic(self):
+        now = pygame.time.get_ticks()
+
+        # Post-punch recovery: freeze movement and facing for 2 seconds
+        if now < getattr(self, 'post_punch_until', 0):
+            self.direction.x = 0
+            return
+
         if not self.on_screen():
             self.direction.x = 1 if (self.player.rect.centerx > self.rect.centerx) else -1
             self.facing_right = self.direction.x > 0
@@ -361,8 +369,6 @@ class MeleeEnemy(Enemy):
         distance     = self.player.rect.centerx - self.rect.centerx
         abs_distance = abs(distance)
         self.facing_right = distance > 0
-
-        now = pygame.time.get_ticks()
 
         if self.state == 'punch':
             self.direction.x = 0
@@ -391,8 +397,9 @@ class MeleeEnemy(Enemy):
 
         if self.frame_index >= len(anim):
             if self.state == 'punch':
-                self.state       = 'walk'
-                self.is_punching = False
+                self.state            = 'walk'
+                self.is_punching      = False
+                self.post_punch_until = pygame.time.get_ticks() + self.POST_PUNCH_PAUSE_MS
             self.frame_index = 0
             anim = self.animations.get(self.state) or self.animations['walk']
 
